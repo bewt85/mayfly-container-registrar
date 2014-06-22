@@ -1,8 +1,2 @@
--e git+https://github.com/jplana/python-etcd.git@0.3.0#egg=python-etcd
-
-argparse==1.2.1
 docker-py==0.3.1
-requests==2.2.1
-six==1.7.2
-websocket-client==0.11.0
-wsgiref==0.1.2
+-e git+https://github.com/jplana/python-etcd.git@0.3.0#egg=python-etcd
