@@ -28,11 +28,14 @@ if not host_ip:
 
 root_node = getEtcdNode('')
 
+current_uuids = []
+
 for container in docker_client.containers():
   image_version = container['Image']
   image_name, version = image_version.split(':')
   service = image_name.split('/')[-1] # foo/bar:0.1 and bar:0.1 both -> bar
   u = uuid.uuid4().hex
+  current_uuids.append(u)
   service_key = "/mayfly/backends/%s/%s/%s" % (service, version, u)
   ports = map(lambda p: (p['PrivatePort'], p['PublicPort']), filter(lambda p: 'PublicPort' in p, container['Ports']))
   root_node["%s/ip" % service_key] = host_ip
@@ -40,3 +43,11 @@ for container in docker_client.containers():
     root_node["%s/port/%s" % (service_key, priv)] = pub
   root_node["%s/env" % service_key] = 'default'
   root_node["%s/healthcheck" % service_key] = 'None'
+
+backend_nodes = getEtcdNode('/mayfly/backends/')
+for service_nodes in backend_nodes.ls():
+  for version_nodes in service_nodes.ls():
+    for uuid_node in version_nodes.ls():
+      if uuid_node.short_key not in current_uuids:
+        print "Node %s is not the latest version" % uuid_node.short_key
+
