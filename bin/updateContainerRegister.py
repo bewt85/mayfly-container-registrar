@@ -16,7 +16,7 @@ Keys should look like
 
 from ClassyEtcd import *
 import docker
-import os, hashlib
+import os, hashlib, logging
 
 docker_client = docker.Client(base_url='unix://var/run/docker.sock')
 
@@ -77,12 +77,16 @@ class BackendFactory(object):
           yield Backend(service, version, host_ip, ports, cid, env, healthcheck)
   def fromDocker(self):
     for container in docker_client.containers():
-      image_version = container['Image']
-      image_name, version = image_version.split(':')
-      service = image_name.split('/')[-1] # foo/bar:0.1 and bar:0.1 both -> bar
-      ports = map(lambda p: (unicode(p['PrivatePort']), unicode(p['PublicPort'])), filter(lambda p: 'PublicPort' in p, container['Ports']))
-      cid = container['Id']
-      yield Backend(service, version, host_ip, ports, cid)
+      try:
+        image_version = container['Image']
+        image_name, version = image_version.split(':')
+        service = image_name.split('/')[-1] # foo/bar:0.1 and bar:0.1 both -> bar
+        ports = map(lambda p: (unicode(p['PrivatePort']), unicode(p['PublicPort'])), filter(lambda p: 'PublicPort' in p, container['Ports']))
+        cid = container['Id']
+        yield Backend(service, version, host_ip, ports, cid)
+      except Exception:
+        logging.error('Exception while reading details of containers from docker', exc_info=True)
+        continue
 
 factory = BackendFactory()
 
