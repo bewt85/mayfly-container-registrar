@@ -25,25 +25,25 @@ if not host_ip:
   raise ValueError('ENV variable HOST_IP missing')
 
 class Backend(object):
-  def __init__(self, service, version, host_ip, ports, env='default', healthcheck='None', md5=None):
+  def __init__(self, service, version, host_ip, ports, cid, env=u'default', healthcheck=u'None'):
     self.service = service
     self.version = version
     self.host_ip = host_ip
     self.ports = ports
+    self.cid = cid
     self.env = env
     self.healthcheck = healthcheck
-    self.original_md5 = md5 
   def addToEtcd(self):
     root_node = getEtcdNode('')
     self.original_md5 = None
-    service_key = "/mayfly/backends/%s/%s/%s" % (self.service, self.version, self.md5())
+    service_key = "/mayfly/backends/%s/%s/%s" % (self.service, self.version, self.cid)
     root_node["%s/ip" % service_key] = self.host_ip
     for (priv, pub) in self.ports:
       root_node["%s/port/%s" % (service_key, priv)] = pub
     root_node["%s/env" % service_key] = self.env
     root_node["%s/healthcheck" % service_key] = self.healthcheck
   def removeFromEtcd(self):
-    service_key = "/mayfly/backends/%s/%s/%s" % (self.service, self.version, self.md5())
+    service_key = "/mayfly/backends/%s/%s/%s" % (self.service, self.version, self.cid)
     backend_node = getEtcdNode(service_key)
     backend_node.rm()
   def __eq__(self, other):
@@ -51,17 +51,15 @@ class Backend(object):
   def __repr__(self):
     return str(self.__dict__)
   def md5(self):
-    if self.original_md5:
-      return self.original_md5
-    else:
-      m = hashlib.md5()
-      m.update(str(self.service))
-      m.update(str(self.version))
-      m.update(str(self.host_ip))
-      m.update(str(sorted(self.ports)))
-      m.update(str(self.env))
-      m.update(str(self.healthcheck))
-      return m.hexdigest() 
+    m = hashlib.md5()
+    m.update(self.service)
+    m.update(self.version)
+    m.update(self.host_ip)
+    m.update(unicode(sorted(self.ports)))
+    m.update(self.cid)
+    m.update(self.env)
+    m.update(self.healthcheck)
+    return m.hexdigest() 
 
 class BackendFactory(object):
   def fromEtcd(self):
@@ -70,20 +68,21 @@ class BackendFactory(object):
       service = service_nodes.short_key
       for version_nodes in service_nodes.ls():
         version = version_nodes.short_key
-        for md5_node in version_nodes.ls():
-          md5 = md5_node.short_key
-          env = md5_node['env'].value if md5_node.get('env') else None
-          host_ip = md5_node['ip'].value
-          healthcheck = md5_node['healthcheck'].value if md5_node.get('healthcheck') else None
-          ports = map(lambda n: (n.short_key, n.value), md5_node['port'].ls())
-          yield Backend(service, version, host_ip, ports, env, healthcheck, md5=md5)
+        for cid_node in version_nodes.ls():
+          cid = cid_node.short_key
+          env = cid_node['env'].value if cid_node.get('env') else None
+          host_ip = cid_node['ip'].value
+          healthcheck = cid_node['healthcheck'].value if cid_node.get('healthcheck') else None
+          ports = map(lambda n: (n.short_key, n.value), cid_node['port'].ls())
+          yield Backend(service, version, host_ip, ports, cid, env, healthcheck)
   def fromDocker(self):
     for container in docker_client.containers():
       image_version = container['Image']
       image_name, version = image_version.split(':')
       service = image_name.split('/')[-1] # foo/bar:0.1 and bar:0.1 both -> bar
-      ports = map(lambda p: (p['PrivatePort'], p['PublicPort']), filter(lambda p: 'PublicPort' in p, container['Ports']))
-      yield Backend(service, version, host_ip, ports)
+      ports = map(lambda p: (unicode(p['PrivatePort']), unicode(p['PublicPort'])), filter(lambda p: 'PublicPort' in p, container['Ports']))
+      cid = container['Id']
+      yield Backend(service, version, host_ip, ports, cid)
 
 factory = BackendFactory()
 
@@ -100,13 +99,13 @@ for container in new_containers:
   container.addToEtcd()
 print
 print
+print "Unchanged Containers"
+for container in unchanged_containers:
+  print container.md5(), container
+print
+print
 print "Old Containers"
 for container in old_containers:
   print container.md5(), container
   container.removeFromEtcd()
-print
-print
-print "Unchanged Containers"
-for container in unchanged_containers:
-  print container.md5(), container
 
