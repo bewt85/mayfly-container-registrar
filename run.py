@@ -90,22 +90,10 @@ latest_containers = list(factory.fromDocker())
 existing_containers = list(factory.fromEtcd())
 
 new_containers = filter(lambda l: l not in existing_containers, latest_containers)
-unchanged_containers = filter(lambda l: l in existing_containers, latest_containers)
 old_containers = filter(lambda e: e not in latest_containers, existing_containers)
 
-print "New Containers"
 for container in new_containers:
-  print container.md5(), container
   container.addToEtcd()
-print
-print
-print "Unchanged Containers"
-for container in unchanged_containers:
-  print container.md5(), container
-print
-print
-print "Old Containers"
 for container in old_containers:
-  print container.md5(), container
   container.removeFromEtcd()
 
