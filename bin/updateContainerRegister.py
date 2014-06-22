@@ -73,7 +73,7 @@ class BackendFactory(object):
           env = cid_node['env'].value if cid_node.get('env') else None
           host_ip = cid_node['ip'].value
           healthcheck = cid_node['healthcheck'].value if cid_node.get('healthcheck') else None
-          ports = map(lambda n: (n.short_key, n.value), cid_node['port'].ls())
+          ports = map(lambda n: (n.short_key, n.value), cid_node['port'].ls() if cid_node.get('port') else [])
           yield Backend(service, version, host_ip, ports, cid, env, healthcheck)
   def fromDocker(self):
     for container in docker_client.containers():
