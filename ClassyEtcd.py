@@ -30,6 +30,11 @@ class Node(object):
       client = getEtcdClient()
       self.nodes = [Node(**n) for n in client.read(self.key, recursive=True)._children]
     return self.nodes
+  def get(self, key, default=None):
+    try:
+      return self[key]
+    except KeyError:
+      return default
   def __getitem__(self, key):
     matches = filter(lambda n: n.short_key == key, self.ls())
     if len(matches) > 1:
