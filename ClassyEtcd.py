@@ -30,6 +30,11 @@ class Node(object):
       client = getEtcdClient()
       self.nodes = [Node(**n) for n in client.read(self.key, recursive=True)._children]
     return self.nodes
+  def rm(self):
+    client = getEtcdClient()
+    client.delete(self.key, recursive=True)
+    self.dir = False
+    self.nodes = []
   def get(self, key, default=None):
     try:
       return self[key]
